@@ -8,7 +8,8 @@ import (
 	"pustaka-api/book"
 
 	"github.com/gin-gonic/gin"
-	"github.com/go-playground/validator"
+	"github.com/go-playground/validator/v10"
+	
 )
 
 type bookHandler struct {
@@ -61,7 +62,7 @@ func (h *bookHandler) GetBook(c *gin.Context) {
 	})
 }
 
-func (h *bookHandler) PostBookHandler(c *gin.Context) {
+func (h *bookHandler) CreateBook(c *gin.Context) {
 	var bookRequest book.BookRequest
 
 	err := c.ShouldBindJSON(&bookRequest)
@@ -89,9 +90,65 @@ func (h *bookHandler) PostBookHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
+		"data": convertToBookResponse(book),
+	})
+
+}
+
+func (h *bookHandler) UpdateBook(c *gin.Context) {
+	var bookRequest book.BookRequest
+
+	err := c.ShouldBindJSON(&bookRequest)
+	if err != nil {
+
+		errorMessages := []string{}
+		for _, e := range err.(validator.ValidationErrors) {
+			errorMessage := fmt.Sprintf("Error on filed %s, condition: %s", e.Field(), e.ActualTag())
+			errorMessages = append(errorMessages, errorMessage)
+			fmt.Println(e)
+		}
+
+		c.JSON(http.StatusBadRequest, gin.H{
+			"errors": errorMessages,
+		})
+		return
+	}
+
+	idString := c.Param("id")
+	id, _ := strconv.Atoi(idString)
+
+	book, err := h.bookService.Update(id, bookRequest)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": err,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
 		"data": book,
 	})
 
+}
+
+func (h *bookHandler) DeleteBook(c *gin.Context) {
+	idString := c.Param("id")
+	id, _ := strconv.Atoi(idString)
+
+	b, err := h.bookService.Delete(int(id))
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"errors": err,
+		})
+		return
+	}
+
+	bookResponse := convertToBookResponse(b)
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": bookResponse,
+	})
 }
 
 func convertToBookResponse(b book.Book) book.BookResponse {
