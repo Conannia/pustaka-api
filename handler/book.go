@@ -4,44 +4,53 @@ import (
 	"fmt"
 	"net/http"
 
+	"pustaka-api/book"
+
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator"
-	"pustaka-api/book"
 )
 
+type bookHandler struct {
+	bookService book.Service
+}
 
-func RootHandler(c *gin.Context) {
+func NewBookHandler(bookService book.Service) *bookHandler {
+	return &bookHandler{bookService}
+}
+
+func (h *bookHandler) GetBooks(c *gin.Context) {
+	books, err := h.bookService.FindAll()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"errors": err,
+		})
+		return
+	}
+
+	var booksResponse []book.BookResponse
+
+	for _, b := range books {
+		bookResponse := book.BookResponse{
+			ID:          b.ID,
+			Title:       b.Title,
+			Price:       b.Price,
+			Description: b.Description,
+			Rating:      b.Rating,
+			Discount:    b.Discount,
+		}
+
+		booksResponse = append(booksResponse, bookResponse)
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"name": "Ken Sanders",
-		"bio":  "A Software enginerr & content creator",
+		"data": booksResponse,
 	})
 }
 
-func HelloHandler(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"title":    "Hello World",
-		"subtitle": "Belajar Golang Bareng",
-	})
-}
+func (h *bookHandler) PostBookHandler(c *gin.Context) {
+	var bookRequest book.BookRequest
 
-func BooksHandler(c *gin.Context) {
-	id := c.Param("id")
-	title := c.Param("title")
-
-	c.JSON(http.StatusOK, gin.H{"id": id, "title": title})
-}
-
-func QueryHandler(c *gin.Context) {
-	title := c.Query("title")
-	price := c.Query("price")
-
-	c.JSON(http.StatusOK, gin.H{"title": title, "price": price})
-}
-
-func PostBookHandler(c *gin.Context) {
-	var bookInput book.BookInput
-
-	err := c.ShouldBindJSON(&bookInput)
+	err := c.ShouldBindJSON(&bookRequest)
 	if err != nil {
 
 		errorMessages := []string{}
@@ -55,13 +64,18 @@ func PostBookHandler(c *gin.Context) {
 			"errors": errorMessages,
 		})
 		return
+	}
 
+	book, err := h.bookService.Create(bookRequest)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": err,
+		})
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"title": bookInput.Title,
-		"price": bookInput.Price,
-		// "sub_title": bookInput.subTitle,
+		"data": book,
 	})
 
 }
